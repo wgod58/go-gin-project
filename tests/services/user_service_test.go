@@ -250,38 +250,63 @@ func TestUserService_Update(t *testing.T) {
 	})
 }
 
-// func TestUserService_Delete(t *testing.T) {
-// 	db, mock, err := setupTestDB(t)
-// 	assert.NoError(t, err)
+func TestUserService_Delete(t *testing.T) {
+	db, sqlMock, err := setupTestDB(t)
+	assert.NoError(t, err)
 
-// 	mockCache := new(MockCache)
-// 	userService := services.NewUserService(db, mockCache)
+	mockCache := new(MockCache)
+	userService := services.NewUserService(db, mockCache)
 
-// 	t.Run("successful deletion", func(t *testing.T) {
-// 		userID := "1"
+	t.Run("successful deletion", func(t *testing.T) {
+		userID := "1"
 
-// 		// Expect find user query
-// 		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? ORDER BY `users`.`id` LIMIT 1")).
-// 			WithArgs(1).
-// 			WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow(1, "Test User"))
+		sqlMock.ExpectBegin()
+		// Expect find user query
+		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
+			WithArgs(userID, 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).
+				AddRow(userID, "Test User", "test@example.com"))
 
-// 		// Expect delete query
-// 		mock.ExpectBegin()
-// 		mock.ExpectExec(regexp.QuoteMeta("DELETE FROM `users`")).
-// 			WillReturnResult(sqlmock.NewResult(1, 1))
-// 		mock.ExpectCommit()
+		// Expect soft delete query with timestamp matching
 
-// 		// Mock cache delete
-// 		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
+		sqlMock.ExpectExec(regexp.QuoteMeta("UPDATE `users` SET `deleted_at`=? WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL")).
+			WithArgs(
+				sqlmock.AnyArg(), // deleted_at timestamp will be set by GORM
+				1,                // user ID
+			).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		sqlMock.ExpectCommit()
 
-// 		// Execute test
-// 		err := userService.Delete(userID)
+		// Mock cache delete
+		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
 
-// 		// Assert results
-// 		assert.NoError(t, err)
+		// Execute test
+		err := userService.Delete(userID)
 
-// 		// Verify all expectations were met
-// 		assert.NoError(t, mock.ExpectationsWereMet())
-// 		mockCache.AssertExpectations(t)
-// 	})
-// }
+		// Assert results
+		assert.NoError(t, err)
+
+		// Verify all expectations were met
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+		mockCache.AssertExpectations(t)
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		userID := "999"
+		sqlMock.ExpectBegin()
+		// Expect find user query that returns no results
+		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
+			WithArgs(userID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		// Execute test
+		err := userService.Delete(userID)
+
+		// Assert results
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "user not found")
+
+		// Verify all expectations were met
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+	})
+}
