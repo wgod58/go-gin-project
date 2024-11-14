@@ -85,8 +85,11 @@ func (s *UserService) Get(id string) (*models.User, error) {
 		return nil, fmt.Errorf("user not found: %v", err)
 	}
 
+	fmt.Println("**************** get user ****************")
+	fmt.Println(user)
+	fmt.Println(err)
 	// Store in cache for future requests
-	s.Cache.SetCache(cacheKey, user, time.Minute*5) // Cache for 5 minutes
+	s.Cache.SetCache(cacheKey, &user, time.Minute*5) // Changed from user to &user
 
 	return &user, nil
 }
