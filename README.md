@@ -49,3 +49,9 @@ docker-compose up -d
 ```bash
 go run main.go
 ```
+
+4.Swagger UI
+
+```bash
+http://localhost:8080/swagger/index.html
+```
