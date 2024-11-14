@@ -182,72 +182,73 @@ func TestUserService_Get(t *testing.T) {
 		mockCache.AssertExpectations(t)
 	})
 
-	// t.Run("user not found", func(t *testing.T) {
-	// 	userID := "999"
+	t.Run("user not found", func(t *testing.T) {
+		userID := "999"
 
-	// 	// Mock cache miss
-	// 	mockCache.On("GetCache", "user:"+userID, mock.AnythingOfType("*models.User")).Return(sql.ErrNoRows)
+		// Mock cache miss
+		mockCache.On("GetCache", "user:"+userID, mock.AnythingOfType("*models.User")).Return(sql.ErrNoRows)
 
-	// 	// Expect database query
-	// 	sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
-	// 		WithArgs(999, 1).
-	// 		WillReturnError(gorm.ErrRecordNotFound)
+		// Expect database query
+		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
+			WithArgs("999", 1).
+			WillReturnError(gorm.ErrRecordNotFound)
 
-	// 	// Execute test
-	// 	user, err := userService.Get(userID)
+		// Execute test
+		user, err := userService.Get(userID)
 
-	// 	// Assert results
-	// 	assert.Error(t, err)
-	// 	assert.Nil(t, user)
-	// 	assert.Contains(t, err.Error(), "user not found")
+		// Assert results
+		assert.Error(t, err)
+		assert.Nil(t, user)
+		assert.Contains(t, err.Error(), "user not found")
 
-	// 	// Verify all expectations were met
-	// 	assert.NoError(t, sqlMock.ExpectationsWereMet())
-	// 	mockCache.AssertExpectations(t)
-	// })
+		// Verify all expectations were met
+		assert.NoError(t, sqlMock.ExpectationsWereMet())
+		mockCache.AssertExpectations(t)
+	})
 }
 
-// func TestUserService_Update(t *testing.T) {
-// 	db, mock, err := setupTestDB(t)
-// 	assert.NoError(t, err)
+func TestUserService_Update(t *testing.T) {
+	db, mock, err := setupTestDB(t)
+	assert.NoError(t, err)
 
-// 	mockCache := new(MockCache)
-// 	userService := services.NewUserService(db, mockCache)
+	mockCache := new(MockCache)
+	userService := services.NewUserService(db, mockCache)
 
-// 	t.Run("successful update", func(t *testing.T) {
-// 		userID := "1"
-// 		updateData := &models.User{
-// 			Name: "Updated Name",
-// 		}
+	t.Run("successful update", func(t *testing.T) {
+		userID := "1"
+		updateData := &models.User{
+			Name: "Updated Name",
+		}
 
-// 		// Expect find user query
-// 		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? ORDER BY `users`.`id` LIMIT 1")).
-// 			WithArgs(1).
-// 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).
-// 				AddRow(1, "Original Name", "test@example.com"))
+		// Expect update query
+		mock.ExpectBegin()
 
-// 		// Expect update query
-// 		mock.ExpectBegin()
-// 		mock.ExpectExec(regexp.QuoteMeta("UPDATE `users`")).
-// 			WillReturnResult(sqlmock.NewResult(1, 1))
-// 		mock.ExpectCommit()
+		// Expect find user query
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
+			WithArgs("1", 1).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).
+				AddRow(1, "Original Name", "test@example.com"))
 
-// 		// Mock cache delete
-// 		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
+		mock.ExpectExec(regexp.QuoteMeta("UPDATE `users`")).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
 
-// 		// Execute test
-// 		updatedUser, err := userService.Update(userID, updateData)
+		// Mock cache delete
+		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
 
-// 		// Assert results
-// 		assert.NoError(t, err)
-// 		assert.NotNil(t, updatedUser)
-// 		assert.Equal(t, updateData.Name, updatedUser.Name)
+		// Execute test
+		updatedUser, err := userService.Update(userID, updateData)
 
-// 		// Verify all expectations were met
-// 		assert.NoError(t, mock.ExpectationsWereMet())
-// 		mockCache.AssertExpectations(t)
-// 	})
-// }
+		// Assert results
+		assert.NoError(t, err)
+		assert.NotNil(t, updatedUser)
+		assert.Equal(t, updateData.Name, updatedUser.Name)
+
+		// Verify all expectations were met
+		assert.NoError(t, mock.ExpectationsWereMet())
+		mockCache.AssertExpectations(t)
+	})
+}
 
 // func TestUserService_Delete(t *testing.T) {
 // 	db, mock, err := setupTestDB(t)
