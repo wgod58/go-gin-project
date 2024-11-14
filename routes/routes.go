@@ -12,6 +12,7 @@ func SetupRoutesWithControllers(r *gin.Engine, paymentController *controllers.Pa
 	auth := r.Group("/api/auth")
 	{
 		auth.POST("/login", authController.Login)
+		auth.POST("/admin-user", userController.Create)
 	}
 
 	// Protected routes

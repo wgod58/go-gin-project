@@ -42,8 +42,13 @@ func main() {
 
 	// Initialize database
 	if err := config.InitDB(); err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal("Failed to initialize database:", err)
 	}
+	defer func() {
+		if err := config.CloseDB(); err != nil {
+			log.Printf("Error closing database connection: %v", err)
+		}
+	}()
 
 	// Initialize Redis cache service
 	cacheService, err := services.NewRedisCache()
