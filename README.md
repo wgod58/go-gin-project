@@ -13,6 +13,8 @@ A robust payment service built with Go, integrating Stripe for payment processin
 - **Docker** - Containerization
 - **Swagger** - API documentation
 - **JWT** - Authentication
+- **GORM Mock** - Mocking for testing
+- **SQLMock** - Mocking for testing
 
 ## Features
 
