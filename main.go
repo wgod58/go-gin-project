@@ -62,13 +62,15 @@ func main() {
 	stripeService := &DefaultStripeService{}
 	userService := services.NewUserService(config.DB, cacheService)
 	paymentService := services.NewPaymentService(config.DB, cacheService, stripeService)
+	authService := services.NewAuthService(config.DB)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
 	paymentController := controllers.NewPaymentController(paymentService)
+	authController := controllers.NewAuthController(authService)
 
 	// Setup routes with the initialized controllers
-	routes.SetupRoutesWithControllers(r, paymentController, userController)
+	routes.SetupRoutesWithControllers(r, paymentController, userController, authController)
 
 	// Run the server
 	r.Run(":8080")

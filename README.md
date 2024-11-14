@@ -12,6 +12,7 @@ A robust payment service built with Go, integrating Stripe for payment processin
 - **MySQL** - Primary database
 - **Docker** - Containerization
 - **Swagger** - API documentation
+- **JWT** - Authentication
 
 ## Features
 
@@ -21,6 +22,7 @@ A robust payment service built with Go, integrating Stripe for payment processin
 - Swagger Documentation
 - Docker Containerization
 - Comprehensive Test Coverage
+
 
 ## Prerequisites
 
