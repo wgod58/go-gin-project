@@ -1,4 +1,4 @@
-.PHONY: up down logs ps clean test
+.PHONY: up down logs ps clean test proto proto-install
 
 # Start all services
 up:
@@ -50,4 +50,24 @@ mysql-cli:
 
 # Connect to Redis CLI
 redis-cli:
-	docker-compose exec redis redis-cli -a password 
+	docker-compose exec redis redis-cli -a password
+
+# Proto related commands
+
+# Install protobuf dependencies
+proto-install:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# Generate proto files
+proto:
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		proto/*.proto
+
+# gRPC related commands
+# grpc-server:
+#   go run cmd/grpc/main.go
+
+grpc-client:
+	go run grpc/client/example/main.go 
