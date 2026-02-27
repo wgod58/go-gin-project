@@ -1,6 +1,6 @@
 # Go Payment Service
 
-A robust payment service built with Go, integrating Stripe for payment processing, MySQL for data persistence, and Redis for caching. This service provides RESTful APIs for user management and payment processing.
+A robust payment service built with Go, integrating Stripe for payment processing, MySQL for data persistence, and Redis for caching. This service provides RESTful APIs and gPRC for user management and payment processing.
 
 ## Tech Stack
 
