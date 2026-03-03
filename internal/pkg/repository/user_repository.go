@@ -3,7 +3,7 @@ package repository
 import (
 	"fmt"
 
-	"go-gin-project/internal/pkg/domain"
+	"go-gin-project/internal/pkg/model"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -13,12 +13,12 @@ type userRepository struct {
 	db *gorm.DB
 }
 
-// NewUserRepository creates a GORM-backed domain.UserRepository.
-func NewUserRepository(db *gorm.DB) domain.UserRepository {
+// NewUserRepository creates a GORM-backed model.UserRepository.
+func NewUserRepository(db *gorm.DB) model.UserRepository {
 	return &userRepository{db: db}
 }
 
-func (r *userRepository) Create(user *domain.User) (*domain.User, error) {
+func (r *userRepository) Create(user *model.User) (*model.User, error) {
 	tx := r.db.Begin()
 	if tx.Error != nil {
 		return nil, fmt.Errorf("create user: begin transaction: %w", tx.Error)
@@ -60,7 +60,7 @@ func (r *userRepository) Create(user *domain.User) (*domain.User, error) {
 	return result, nil
 }
 
-func (r *userRepository) FindByID(id string) (*domain.User, error) {
+func (r *userRepository) FindByID(id string) (*model.User, error) {
 	var m userModel
 	if err := r.db.First(&m, id).Error; err != nil {
 		return nil, fmt.Errorf("find user: %w", err)
@@ -68,7 +68,7 @@ func (r *userRepository) FindByID(id string) (*domain.User, error) {
 	return toUserDomain(&m), nil
 }
 
-func (r *userRepository) FindByEmail(email string) (*domain.User, error) {
+func (r *userRepository) FindByEmail(email string) (*model.User, error) {
 	var m userModel
 	if err := r.db.Where("email = ?", email).First(&m).Error; err != nil {
 		return nil, fmt.Errorf("find user by email: %w", err)
@@ -76,7 +76,7 @@ func (r *userRepository) FindByEmail(email string) (*domain.User, error) {
 	return toUserDomain(&m), nil
 }
 
-func (r *userRepository) Update(id string, data *domain.User) (*domain.User, error) {
+func (r *userRepository) Update(id string, data *model.User) (*model.User, error) {
 	tx := r.db.Begin()
 	if tx.Error != nil {
 		return nil, fmt.Errorf("update user: begin transaction: %w", tx.Error)

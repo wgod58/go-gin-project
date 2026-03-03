@@ -3,7 +3,7 @@ package repository
 import (
 	"time"
 
-	"go-gin-project/internal/pkg/domain"
+	"go-gin-project/internal/pkg/model"
 
 	"gorm.io/gorm"
 )
@@ -21,12 +21,12 @@ type userModel struct {
 
 func (userModel) TableName() string { return "users" }
 
-func toUserDomain(m *userModel) *domain.User {
+func toUserDomain(m *userModel) *model.User {
 	var deletedAt *time.Time
 	if m.DeletedAt.Valid {
 		deletedAt = &m.DeletedAt.Time
 	}
-	return &domain.User{
+	return &model.User{
 		ID:        m.ID,
 		Name:      m.Name,
 		Email:     m.Email,
@@ -37,7 +37,7 @@ func toUserDomain(m *userModel) *domain.User {
 	}
 }
 
-func toUserModel(u *domain.User) *userModel {
+func toUserModel(u *model.User) *userModel {
 	return &userModel{
 		ID:       u.ID,
 		Name:     u.Name,
@@ -61,12 +61,12 @@ type paymentModel struct {
 
 func (paymentModel) TableName() string { return "payments" }
 
-func toPaymentDomain(m *paymentModel) *domain.Payment {
+func toPaymentDomain(m *paymentModel) *model.Payment {
 	var deletedAt *time.Time
 	if m.DeletedAt.Valid {
 		deletedAt = &m.DeletedAt.Time
 	}
-	return &domain.Payment{
+	return &model.Payment{
 		ID:            m.ID,
 		UserID:        m.UserID,
 		Amount:        m.Amount,
@@ -79,7 +79,7 @@ func toPaymentDomain(m *paymentModel) *domain.Payment {
 	}
 }
 
-func toPaymentModel(p *domain.Payment) *paymentModel {
+func toPaymentModel(p *model.Payment) *paymentModel {
 	return &paymentModel{
 		ID:            p.ID,
 		UserID:        p.UserID,
