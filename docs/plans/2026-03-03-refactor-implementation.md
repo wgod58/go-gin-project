@@ -27,7 +27,7 @@ grpc/                        →  internal/transport/grpc/
 proto/                       →  api/proto/
 tests/                       →  test/
 interfaces/                  →  deleted (interfaces move to domain/)
-                             →  NEW: internal/infrastructure/mysql/ (repos)
+                             →  NEW: internal/infrastructure/repository/ (repos)
                              →  NEW: internal/infrastructure/stripe/client.go
 ```
 
@@ -252,10 +252,10 @@ git commit -m "feat: add domain layer with entities and repository interfaces"
 ## Task 3: Create infrastructure/mysql repositories
 
 **Files:**
-- Create: `internal/infrastructure/mysql/user_repository.go`
-- Create: `internal/infrastructure/mysql/payment_repository.go`
+- Create: `internal/infrastructure/repository/user_repository.go`
+- Create: `internal/infrastructure/repository/payment_repository.go`
 
-**Step 1: Create `internal/infrastructure/mysql/user_repository.go`**
+**Step 1: Create `internal/infrastructure/repository/user_repository.go`**
 
 ```go
 package mysql
@@ -401,7 +401,7 @@ func (r *userRepository) Delete(id string) error {
 }
 ```
 
-**Step 2: Create `internal/infrastructure/mysql/payment_repository.go`**
+**Step 2: Create `internal/infrastructure/repository/payment_repository.go`**
 
 ```go
 package mysql
@@ -449,14 +449,14 @@ func (r *paymentRepository) UpdateStatus(payment *domain.Payment) (*domain.Payme
 **Step 3: Verify compile**
 
 ```bash
-go build ./internal/infrastructure/mysql/...
+go build ./internal/infrastructure/repository/...
 ```
 Expected: no output
 
 **Step 4: Commit**
 
 ```bash
-git add internal/infrastructure/mysql/
+git add internal/infrastructure/repository/
 git commit -m "feat: add MySQL repository implementations"
 ```
 
