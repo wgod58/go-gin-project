@@ -1,14 +1,16 @@
-package services_test
+package service_test
 
 import (
 	"database/sql"
 	"fmt"
-	"go-gin-project/interfaces"
-	"go-gin-project/models"
-	"go-gin-project/services"
 	"regexp"
 	"testing"
 	"time"
+
+	"go-gin-project/internal/app/service"
+	"go-gin-project/internal/pkg/model"
+	"go-gin-project/internal/pkg/repository"
+	"go-gin-project/test/mocks"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -17,31 +19,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// MockCache for testing
-type MockCache struct {
-	mock.Mock
-}
-
-var _ interfaces.CacheInterface = (*MockCache)(nil)
-
-func (m *MockCache) GetCache(key string, dest interface{}) error {
-	args := m.Called(key, dest)
-	return args.Error(0)
-}
-
-func (m *MockCache) SetCache(key string, value interface{}, expiration time.Duration) error {
-	args := m.Called(key, value, expiration)
-	return args.Error(0)
-}
-
-func (m *MockCache) DeleteCache(key string) error {
-	args := m.Called(key)
-	return args.Error(0)
-}
-
 func setupTestDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, error) {
 	// Create new mock database
-	sqlDB, mock, err := sqlmock.New()
+	sqlDB, sqlMockObj, err := sqlmock.New()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -57,18 +37,19 @@ func setupTestDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, error) {
 		return nil, nil, err
 	}
 
-	return db, mock, nil
+	return db, sqlMockObj, nil
 }
 
 func TestUserService_Create(t *testing.T) {
 	db, sqlMock, err := setupTestDB(t)
 	assert.NoError(t, err)
 
-	mockCache := new(MockCache)
-	userService := services.NewUserService(db, mockCache)
+	userRepo := repository.NewUserRepository(db)
+	mockCache := new(mocks.MockCache)
+	userService := service.NewUserService(userRepo, mockCache)
 
 	t.Run("duplicate email", func(t *testing.T) {
-		user := &models.User{
+		user := &model.User{
 			Email: "existing@example.com",
 		}
 
@@ -97,7 +78,7 @@ func TestUserService_Create(t *testing.T) {
 	})
 
 	t.Run("successful user creation", func(t *testing.T) {
-		user := &models.User{
+		user := &model.User{
 			Name:     "Test User",
 			Email:    "test@example.com",
 			Password: "password123",
@@ -141,19 +122,20 @@ func TestUserService_Get(t *testing.T) {
 	db, sqlMock, err := setupTestDB(t)
 	assert.NoError(t, err)
 
-	mockCache := new(MockCache)
-	userService := services.NewUserService(db, mockCache)
+	userRepo := repository.NewUserRepository(db)
+	mockCache := new(mocks.MockCache)
+	userService := service.NewUserService(userRepo, mockCache)
 
 	t.Run("get user successfully", func(t *testing.T) {
 		userID := "1"
-		expectedUser := &models.User{
+		expectedUser := &model.User{
 			ID:    1,
 			Name:  "Test User",
 			Email: "test@example.com",
 		}
 
 		// Mock cache miss
-		mockCache.On("GetCache", "user:"+userID, mock.AnythingOfType("*models.User")).Return(sql.ErrNoRows)
+		mockCache.On("Get", "user:"+userID, mock.AnythingOfType("*model.User")).Return(sql.ErrNoRows)
 
 		// Expect database query with exact SQL pattern
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
@@ -162,7 +144,7 @@ func TestUserService_Get(t *testing.T) {
 				AddRow(expectedUser.ID, expectedUser.Name, expectedUser.Email))
 
 		// Mock cache set
-		mockCache.On("SetCache", "user:"+userID, mock.AnythingOfType("*models.User"), 5*time.Minute).Return(nil)
+		mockCache.On("Set", "user:"+userID, mock.AnythingOfType("*model.User"), 5*time.Minute).Return(nil)
 
 		// Execute test
 		user, err := userService.Get(userID)
@@ -186,7 +168,7 @@ func TestUserService_Get(t *testing.T) {
 		userID := "999"
 
 		// Mock cache miss
-		mockCache.On("GetCache", "user:"+userID, mock.AnythingOfType("*models.User")).Return(sql.ErrNoRows)
+		mockCache.On("Get", "user:"+userID, mock.AnythingOfType("*model.User")).Return(sql.ErrNoRows)
 
 		// Expect database query
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
@@ -199,7 +181,7 @@ func TestUserService_Get(t *testing.T) {
 		// Assert results
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.Contains(t, err.Error(), "user not found")
+		assert.Contains(t, err.Error(), "record not found")
 
 		// Verify all expectations were met
 		assert.NoError(t, sqlMock.ExpectationsWereMet())
@@ -208,33 +190,34 @@ func TestUserService_Get(t *testing.T) {
 }
 
 func TestUserService_Update(t *testing.T) {
-	db, mock, err := setupTestDB(t)
+	db, sqlMockObj, err := setupTestDB(t)
 	assert.NoError(t, err)
 
-	mockCache := new(MockCache)
-	userService := services.NewUserService(db, mockCache)
+	userRepo := repository.NewUserRepository(db)
+	mockCache := new(mocks.MockCache)
+	userService := service.NewUserService(userRepo, mockCache)
 
 	t.Run("successful update", func(t *testing.T) {
 		userID := "1"
-		updateData := &models.User{
+		updateData := &model.User{
 			Name: "Updated Name",
 		}
 
 		// Expect update query
-		mock.ExpectBegin()
+		sqlMockObj.ExpectBegin()
 
 		// Expect find user query
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
+		sqlMockObj.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `users` WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT ?")).
 			WithArgs("1", 1).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "name", "email"}).
 				AddRow(1, "Original Name", "test@example.com"))
 
-		mock.ExpectExec(regexp.QuoteMeta("UPDATE `users`")).
+		sqlMockObj.ExpectExec(regexp.QuoteMeta("UPDATE `users`")).
 			WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectCommit()
+		sqlMockObj.ExpectCommit()
 
 		// Mock cache delete
-		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
+		mockCache.On("Delete", "user:"+userID).Return(nil)
 
 		// Execute test
 		updatedUser, err := userService.Update(userID, updateData)
@@ -245,7 +228,7 @@ func TestUserService_Update(t *testing.T) {
 		assert.Equal(t, updateData.Name, updatedUser.Name)
 
 		// Verify all expectations were met
-		assert.NoError(t, mock.ExpectationsWereMet())
+		assert.NoError(t, sqlMockObj.ExpectationsWereMet())
 		mockCache.AssertExpectations(t)
 	})
 }
@@ -254,8 +237,9 @@ func TestUserService_Delete(t *testing.T) {
 	db, sqlMock, err := setupTestDB(t)
 	assert.NoError(t, err)
 
-	mockCache := new(MockCache)
-	userService := services.NewUserService(db, mockCache)
+	userRepo := repository.NewUserRepository(db)
+	mockCache := new(mocks.MockCache)
+	userService := service.NewUserService(userRepo, mockCache)
 
 	t.Run("successful deletion", func(t *testing.T) {
 		userID := "1"
@@ -268,7 +252,6 @@ func TestUserService_Delete(t *testing.T) {
 				AddRow(userID, "Test User", "test@example.com"))
 
 		// Expect soft delete query with timestamp matching
-
 		sqlMock.ExpectExec(regexp.QuoteMeta("UPDATE `users` SET `deleted_at`=? WHERE `users`.`id` = ? AND `users`.`deleted_at` IS NULL")).
 			WithArgs(
 				sqlmock.AnyArg(), // deleted_at timestamp will be set by GORM
@@ -278,7 +261,7 @@ func TestUserService_Delete(t *testing.T) {
 		sqlMock.ExpectCommit()
 
 		// Mock cache delete
-		mockCache.On("DeleteCache", "user:"+userID).Return(nil)
+		mockCache.On("Delete", "user:"+userID).Return(nil)
 
 		// Execute test
 		err := userService.Delete(userID)
@@ -299,12 +282,14 @@ func TestUserService_Delete(t *testing.T) {
 			WithArgs(userID, 1).
 			WillReturnError(gorm.ErrRecordNotFound)
 
+		sqlMock.ExpectRollback()
+
 		// Execute test
 		err := userService.Delete(userID)
 
 		// Assert results
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user not found")
+		assert.Contains(t, err.Error(), "record not found")
 
 		// Verify all expectations were met
 		assert.NoError(t, sqlMock.ExpectationsWereMet())

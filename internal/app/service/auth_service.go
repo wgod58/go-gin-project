@@ -1,19 +1,22 @@
-package services
+package service
 
 import (
 	"errors"
-	"go-gin-project/middleware"
-	"go-gin-project/models"
 	"os"
 	"time"
+
+	"go-gin-project/internal/pkg/model"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-type AuthService struct {
-	DB *gorm.DB
+// Claims is the JWT payload. Defined here so transport/middleware imports service.Claims.
+type Claims struct {
+	UserID uint   `json:"user_id"`
+	Email  string `json:"email"`
+	jwt.RegisteredClaims
 }
 
 type LoginRequest struct {
@@ -27,16 +30,18 @@ type LoginResponse struct {
 	UserID    uint   `json:"user_id"`
 }
 
-func NewAuthService(db *gorm.DB) *AuthService {
-	return &AuthService{
-		DB: db,
-	}
+type AuthService struct {
+	userRepo model.UserRepository
+}
+
+func NewAuthService(userRepo model.UserRepository) *AuthService {
+	return &AuthService{userRepo: userRepo}
 }
 
 func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
-	var user models.User
-	if err := s.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	user, err := s.userRepo.FindByEmail(req.Email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("invalid email or password")
 		}
 		return nil, err
@@ -46,26 +51,25 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, errors.New("invalid email or password")
 	}
 
-	// Generate JWT token
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &middleware.Claims{
+	expiry := time.Now().Add(24 * time.Hour)
+	claims := &Claims{
 		UserID: user.ID,
 		Email:  user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			ExpiresAt: jwt.NewNumericDate(expiry),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	tokenStr, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
 		return nil, err
 	}
 
 	return &LoginResponse{
-		Token:     tokenString,
-		ExpiresIn: expirationTime.Unix(),
+		Token:     tokenStr,
+		ExpiresIn: expiry.Unix(),
 		UserID:    user.ID,
 	}, nil
 }

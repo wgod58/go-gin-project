@@ -9,7 +9,7 @@ Project-specific rules are in .claude/rules/ and are automatically loaded based 
 ```bash
 # Run tests
 make test           # go test ./... -v
-go test ./tests/... -v  # test specific package
+go test ./test/... -v  # test specific package
 
 # Docker services (MySQL + Redis)
 make up             # start all services
@@ -20,7 +20,7 @@ make redis-cli      # connect to Redis shell
 
 # Protobuf code generation
 make proto-install  # install protoc-gen-go and protoc-gen-go-grpc
-make proto          # regenerate from proto/*.proto
+make proto          # regenerate from api/proto/*.proto
 
 # Run app locally (requires .env and Docker services running)
 go run main.go
@@ -36,20 +36,25 @@ Two servers start concurrently in `main.go`:
 - **gRPC** (port 50051, `$GRPC_PORT`) — user service via protobuf
 
 ```
-main.go               Entry point, wires dependencies
-config/config.go      DB init (GORM + AutoMigrate), env loading
-models/               GORM models: User, Payment
-services/             Business logic: user, auth, payment, redis cache
-controllers/          Gin handlers: user, auth, payment
-routes/routes.go      Route registration
-middleware/auth.go    JWT auth middleware
-interfaces/           Service interfaces (used for mocking)
-grpc/server/          gRPC server implementation
-grpc/client/          gRPC client + example
-proto/                .proto definition + generated .pb.go files
-tests/services/       Service unit tests (go-sqlmock)
-tests/mocks/          Cache and Stripe mocks
-docs/                 Swagger auto-generated docs
+main.go                    # wires all layers, starts HTTP + gRPC
+config/config.go           # DB init (GORM + AutoMigrate via repository.Migrate)
+internal/
+  app/
+    service/               # UserService, AuthService, PaymentService + Claims/LoginRequest/LoginResponse
+    handler/               # Gin HTTP handlers (user, auth, payment)
+    middleware/            # JWT auth middleware
+    routes.go              # route registration
+  pkg/
+    model/                 # User, Payment entities + UserRepository/PaymentRepository/CacheService/StripeService interfaces
+    repository/            # GORM models + MySQL implementations
+    cache/                 # Redis cache implementation
+    stripe/                # Stripe client implementation
+api/proto/                 # .proto definition + generated .pb.go files
+grpc/server/               # gRPC server implementation
+grpc/client/               # gRPC client + example
+test/services/             # Service unit tests (go-sqlmock)
+test/mocks/                # Cache and Stripe mocks
+docs/                      # Swagger auto-generated docs + design plans
 ```
 
 ## Routes
@@ -93,17 +98,18 @@ Docker Compose defaults: MySQL root password `password`, Redis password `passwor
 
 ## Testing
 
-Tests use **go-sqlmock** for DB and custom mocks for Redis/Stripe in `tests/mocks/`.
+Tests use **go-sqlmock** for DB and custom mocks for Redis/Stripe in `test/mocks/`.
 
 ```bash
-go test ./tests/... -v -run TestUserService
+go test ./test/... -v
+go test ./test/... -v -run TestUserService
 ```
 
-Mock pattern: implement the interface from `interfaces/`, inject via constructor. See `tests/mocks/cache_mock.go`.
+Mock pattern: implement the interface from `internal/pkg/model/`, inject via constructor. See `test/mocks/cache_mock.go`.
 
 ## Key Patterns
 
-- **Dependency injection**: Services receive `*gorm.DB` and `interfaces.CacheInterface` via constructors.
-- **Interface-based**: All external dependencies (DB, cache, Stripe) are behind interfaces for testability.
-- **AutoMigrate**: `config.InitDB()` runs GORM AutoMigrate on startup for `User` and `Payment` models.
-- **Swagger**: Run `swag init` after changing controller annotations to regenerate `docs/`.
+- **Dependency injection**: Services receive `model.UserRepository` and `model.CacheService` via constructors.
+- **Interface-based**: All external dependencies behind interfaces in `internal/pkg/model/`.
+- **AutoMigrate**: `repository.Migrate(db)` called via `config.InitDB()`.
+- **Swagger**: Run `swag init` after changing handler annotations to regenerate `docs/`.

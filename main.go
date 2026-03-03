@@ -10,113 +10,83 @@ import (
 	"time"
 
 	"go-gin-project/config"
-	"go-gin-project/controllers"
-	"go-gin-project/grpc/server"
-	"go-gin-project/routes"
-	"go-gin-project/services"
+	apppkg "go-gin-project/internal/app"
+	"go-gin-project/internal/app/handler"
+	"go-gin-project/internal/app/service"
+	"go-gin-project/internal/pkg/cache"
+	"go-gin-project/internal/pkg/repository"
+	stripepkg "go-gin-project/internal/pkg/stripe"
+	grpcserver "go-gin-project/grpc/server"
 
-	_ "go-gin-project/docs" // This is required for swagger
+	_ "go-gin-project/docs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/stripe/stripe-go/v72"
-	"github.com/stripe/stripe-go/v72/paymentintent"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// DefaultStripeService implements the StripeService interface using the default Stripe client
-type DefaultStripeService struct{}
-
-func (s *DefaultStripeService) New(params *stripe.PaymentIntentParams) (*stripe.PaymentIntent, error) {
-	return paymentintent.New(params)
-}
-
-func (s *DefaultStripeService) Get(id string, params *stripe.PaymentIntentParams) (*stripe.PaymentIntent, error) {
-	return paymentintent.Get(id, params)
-}
-
 func main() {
-	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: .env file not found: %v", err)
 	}
 
-	// Initialize Stripe
-	if err := controllers.InitStripe(); err != nil {
-		log.Printf("Warning: Failed to initialize Stripe: %v", err)
-		log.Println("Payment features may not work properly")
-	}
-
-	// Initialize database
 	if err := config.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer func() {
-		if err := config.CloseDB(); err != nil {
-			log.Printf("Error closing database connection: %v", err)
-		}
-	}()
+	defer config.CloseDB() //nolint:errcheck
 
-	// Initialize Redis cache service
-	cacheService, err := services.NewRedisCache()
+	// Infrastructure layer
+	cacheService, err := cache.New()
 	if err != nil {
-		log.Printf("Warning: Failed to initialize Redis: %v", err)
-		log.Println("Application will continue without caching")
+		log.Printf("Warning: Redis unavailable, continuing without cache: %v", err)
 	}
 
-	// Create Gin router
-	r := gin.Default()
+	stripeClient, err := stripepkg.New()
+	if err != nil {
+		log.Printf("Warning: Stripe unavailable: %v", err)
+	}
 
-	// Swagger documentation endpoint
+	userRepo := repository.NewUserRepository(config.DB)
+	paymentRepo := repository.NewPaymentRepository(config.DB)
+
+	// Application layer
+	userService := service.NewUserService(userRepo, cacheService)
+	authService := service.NewAuthService(userRepo)
+	paymentService := service.NewPaymentService(paymentRepo, userRepo, cacheService, stripeClient)
+
+	// Transport layer
+	r := gin.Default()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Initialize services
-	stripeService := &DefaultStripeService{}
-	userService := services.NewUserService(config.DB, cacheService)
-	paymentService := services.NewPaymentService(config.DB, cacheService, stripeService)
-	authService := services.NewAuthService(config.DB)
+	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(authService)
+	paymentHandler := handler.NewPaymentHandler(paymentService)
+	apppkg.SetupRoutes(r, userHandler, authHandler, paymentHandler)
 
-	// Initialize controllers
-	userController := controllers.NewUserController(userService)
-	paymentController := controllers.NewPaymentController(paymentService)
-	authController := controllers.NewAuthController(authService)
+	srv := &http.Server{Addr: ":8080", Handler: r}
 
-	// Setup routes with the initialized controllers
-	routes.SetupRoutesWithControllers(r, paymentController, userController, authController)
-
-	// Create HTTP server
-	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: r,
-	}
-
-	// Start HTTP server in a goroutine
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start HTTP server: %v", err)
+			log.Fatalf("HTTP server error: %v", err)
 		}
 	}()
 
-	// Start gRPC server in a goroutine
 	go func() {
-		if err := server.StartGrpcServer(cacheService); err != nil {
-			log.Fatalf("Failed to start gRPC server: %v", err)
+		if err := grpcserver.StartGrpcServer(cacheService); err != nil {
+			log.Fatalf("gRPC server error: %v", err)
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the servers
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down servers...")
 
-	// Shutdown HTTP server with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown:", err)
 	}
-
 	log.Println("Servers exited properly")
 }

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package proto;
 
-option go_package = "go-gin-project/proto";
+option go_package = "go-gin-project/api/proto";
 
 service UserService {
   rpc CreateUser(CreateUserRequest) returns (UserResponse) {}
