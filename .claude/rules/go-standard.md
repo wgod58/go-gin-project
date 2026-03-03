@@ -5,56 +5,155 @@ globs: ["**/*.go"]
 
 # Go Project Layout Standard
 
-Follow the [golang-standards/project-layout](https://github.com/golang-standards/project-layout) conventions.
+Reference: [golang-standards/project-layout](https://github.com/golang-standards/project-layout)
 
-## Directory Structure
+> This is **not an official standard** defined by the core Go dev team. It is a set of common historical and emerging project layout patterns in the Go ecosystem.
 
-| Directory | Purpose |
-|-----------|---------|
-| `/cmd` | Main application entrypoints. Each sub-dir = one binary. Keep logic minimal — delegate to `/internal` or `/pkg`. |
-| `/internal` | Private app code not importable by external projects. Go compiler enforces this. |
-| `/pkg` | Library code safe for external use. Add deliberately — changes affect consumers. |
-| `/api` | OpenAPI/Swagger specs, protobuf definitions, JSON schemas. |
-| `/configs` | Config file templates and defaults. |
-| `/scripts` | Build, install, analysis scripts. Keeps Makefile simple. |
-| `/build` | CI configs and packaging (`/build/ci`, `/build/package`). |
-| `/deployments` | Docker Compose, Kubernetes, Helm, Terraform. |
-| `/test` | External test apps and test data (`/test/data`). |
-| `/docs` | Design docs and user guides (supplements godoc). |
-| `/tools` | Supporting tools; may import from `/pkg` and `/internal`. |
-| `/examples` | Sample apps and usage demos. |
-| `/vendor` | Vendored dependencies (`go mod vendor`). Optional with Go 1.13+ module proxy. |
+## Go Directories
 
-**Never use `/src`** — this is a Java pattern and creates unnecessary nesting in Go.
+### `/cmd`
+Main applications for this project. Each subdirectory name should match the executable name (e.g., `/cmd/myapp`). Keep `main` functions minimal — they should only import and invoke code from `/internal` and `/pkg`. Don't put a lot of code here.
 
-## Code Conventions
+### `/internal`
+**Private application and library code.** The Go compiler enforces this — packages inside `internal/` cannot be imported by code outside the parent of the `internal/` directory.
 
-- **Formatting**: All code must pass `gofmt`. Run before committing.
-- **Linting**: Use `staticcheck` for code quality checks.
-- **Modules**: Use Go Modules (`go.mod`/`go.sum`). Do not use GOPATH-based layout.
-- **Package naming**: Lowercase, single word, no underscores or mixed caps (e.g., `userservice` not `UserService` or `user_service`).
-- **Error handling**: Always handle errors explicitly. Do not use `_` to discard errors from functions that return them.
-- **Interfaces**: Define interfaces in the consuming package, not the implementing package.
-- **Internal packages**: Put application-specific code that shouldn't be shared in `/internal`. The Go compiler enforces this boundary.
+Sub-structure pattern for larger projects:
+- `/internal/app/<appname>` — application-specific private code (services, handlers, middleware, routes)
+- `/internal/pkg/<privlib>` — shared private libraries (models, repositories, infrastructure adapters)
+
+You can have multiple `internal/` directories at any level of your project tree.
+
+### `/pkg`
+Library code safe for use by external applications. Other projects can import these. Use `/internal` instead if you don't want the code to be importable externally.
+
+### `/vendor`
+Application dependencies (`go mod vendor`). Optional with Go 1.13+ module proxy.
+
+## Service Application Directories
+
+### `/api`
+OpenAPI/Swagger specs, JSON schema files, protocol definition files (e.g., `.proto` files).
+
+## Common Application Directories
+
+### `/configs`
+Configuration file templates or default configs (confd, consul-template files).
+
+### `/scripts`
+Scripts for build, install, analysis operations. Keeps the root Makefile small and simple.
+
+### `/build`
+Packaging and CI/CD:
+- `/build/package` — cloud/container/OS package configs
+- `/build/ci` — CI configs (Travis, Circle, Drone, GitHub Actions)
+
+### `/deployments`
+IaaS, PaaS, container orchestration configs: docker-compose, Kubernetes/Helm, Terraform. Sometimes called `/deploy`.
+
+### `/test`
+Additional external test apps and test data. Go ignores directories/files beginning with `.` or `_`.
+- `/test/data` or `/test/testdata` — test data files Go should ignore
+
+## Other Directories
+
+### `/docs`
+Design and user documents (in addition to godoc-generated documentation).
+
+### `/tools`
+Supporting tools. Can import from `/pkg` and `/internal`.
+
+### `/examples`
+Examples for your applications and/or public libraries.
+
+### `/third_party`
+External helper tools, forked code, third-party utilities (e.g., Swagger UI).
+
+### `/githooks`
+Git hook scripts.
+
+### `/assets`
+Images, logos, and other media assets for the repository.
+
+## Directories You Should NOT Have
+
+### `/src`
+**Never use this.** It's a Java pattern. It creates unnecessary nesting and does not belong in Go projects.
+
+## The `internal/` Sub-Pattern
+
+For projects using `internal/app` + `internal/pkg`:
+
+```
+internal/
+  app/
+    <appname>/    # or flat: service/, handler/, middleware/
+  pkg/
+    <privlib>/    # shared private libraries
+```
+
+Example for this project:
+```
+internal/
+  app/
+    service/      # business logic (UserService, AuthService, PaymentService)
+    handler/      # HTTP handlers
+    middleware/   # JWT auth middleware
+  pkg/
+    model/        # domain entities + repository/service interfaces
+    repository/   # GORM models + DB implementations
+    cache/        # Redis cache implementation
+    stripe/       # Stripe client implementation
+```
+
+## Key Principles
+
+- **Start simple**: For small projects, `main.go` + `go.mod` is enough. Add structure as you grow.
+- **Use Go Modules**: `go.mod`/`go.sum` — don't use GOPATH-based layout.
+- **`internal/` over `pkg/`**: Use `internal/` to enforce package privacy. The compiler enforces it.
+- **Minimal `cmd/`**: Keep `main` functions thin — just wiring and startup.
+- **`/api` for specs**: Put `.proto`, OpenAPI/Swagger, JSON schema files here.
+- **`/test` for external tests**: Unit tests live alongside source files (`_test.go`). `/test` is for external integration tests and test data.
 
 ## This Project's Layout
 
-This project partially follows the standard. Current structure:
-
 ```
-cmd/                  (if adding new binaries, place here)
-config/               → maps to configs/ convention
-controllers/          → belongs in internal/
-services/             → belongs in internal/
-models/               → belongs in internal/
-middleware/           → belongs in internal/
-interfaces/           → belongs in internal/ or pkg/
-routes/               → belongs in internal/
-grpc/                 → belongs in internal/
-proto/                → belongs in api/
-tests/                → belongs in test/
-examples/             → standard /examples
-docs/                 → standard /docs
+go-gin-project/
+├── main.go                    # wiring + server startup (HTTP :8080, gRPC :50051)
+├── go.mod / go.sum
+├── Makefile
+├── docker-compose.yml
+│
+├── internal/
+│   ├── app/
+│   │   ├── service/           # UserService, AuthService, PaymentService
+│   │   ├── handler/           # Gin HTTP handlers (user, auth, payment)
+│   │   └── middleware/        # JWT auth middleware
+│   └── pkg/
+│       ├── model/             # User, Payment entities + repository/cache interfaces
+│       ├── repository/        # GORM models + MySQL implementations
+│       ├── cache/             # Redis cache implementation
+│       └── stripe/            # Stripe client implementation
+│
+├── api/
+│   └── proto/                 # .proto definitions + generated .pb.go
+│
+├── grpc/
+│   ├── server/                # gRPC server
+│   └── client/                # gRPC client + examples
+│
+├── config/                    # DB + env initialization (bootstrap, not business logic)
+├── docs/                      # Swagger docs + design plans
+├── examples/                  # Usage examples
+└── test/
+    └── mocks/                 # Mock implementations for testing
 ```
 
-When creating new packages, prefer the standard layout above over adding top-level directories.
+## Enforcement
+
+Run before every commit:
+```bash
+gofmt -w .          # format
+go vet ./...        # common mistakes
+staticcheck ./...   # advanced analysis
+go test ./... -v    # all tests pass
+```
