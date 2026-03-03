@@ -3,7 +3,7 @@ package repository
 import (
 	"fmt"
 
-	"go-gin-project/internal/domain"
+	"go-gin-project/internal/pkg/domain"
 
 	"gorm.io/gorm"
 )
