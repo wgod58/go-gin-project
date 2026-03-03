@@ -6,7 +6,7 @@
 
 **Architecture:** `transport → application → domain ← infrastructure`. Domain defines entities and interfaces. Infrastructure implements them. Application contains business logic. Transport handles HTTP/gRPC. `main.go` wires everything.
 
-**Tech Stack:** Go 1.23, Gin, GORM (MySQL), Redis, Stripe, JWT, gRPC, go-sqlmock, testify/mock
+**Tech Stack:** Go 1.26, Gin, GORM (MySQL), Redis, Stripe, JWT, gRPC, go-sqlmock, testify/mock
 
 ---
 

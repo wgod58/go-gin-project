@@ -1,6 +1,6 @@
 # go-gin-project
 
-Go REST API + gRPC server using Gin, GORM (MySQL), Redis, JWT auth, and Stripe payments.
+Go 1.26 REST API + gRPC server using Gin, GORM (MySQL), Redis, JWT auth, and Stripe payments.
 
 Project-specific rules are in .claude/rules/ and are automatically loaded based on file path patterns.
 
