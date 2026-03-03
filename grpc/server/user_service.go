@@ -2,11 +2,12 @@ package server
 
 import (
 	"context"
-	"go-gin-project/models"
-	pb "go-gin-project/proto"
-	"go-gin-project/services"
 	"strconv"
 	"time"
+
+	pb "go-gin-project/api/proto"
+	"go-gin-project/internal/app/service"
+	"go-gin-project/internal/pkg/model"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,17 +15,17 @@ import (
 
 type UserGrpcService struct {
 	pb.UnimplementedUserServiceServer
-	userService *services.UserService
+	userService *service.UserService
 }
 
-func NewUserGrpcService(userService *services.UserService) *UserGrpcService {
+func NewUserGrpcService(userService *service.UserService) *UserGrpcService {
 	return &UserGrpcService{
 		userService: userService,
 	}
 }
 
 func (s *UserGrpcService) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.UserResponse, error) {
-	user := &models.User{
+	user := &model.User{
 		Email:    req.Email,
 		Password: req.Password,
 		Name:     req.Name,
@@ -60,7 +61,7 @@ func (s *UserGrpcService) GetUser(ctx context.Context, req *pb.GetUserRequest) (
 }
 
 func (s *UserGrpcService) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) (*pb.UserResponse, error) {
-	updates := &models.User{}
+	updates := &model.User{}
 	if req.Email != nil {
 		updates.Email = *req.Email
 	}

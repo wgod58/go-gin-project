@@ -6,22 +6,24 @@ import (
 	"net"
 	"os"
 
+	"go-gin-project/api/proto"
 	"go-gin-project/config"
-	"go-gin-project/interfaces"
-	"go-gin-project/proto"
-	"go-gin-project/services"
+	"go-gin-project/internal/app/service"
+	"go-gin-project/internal/pkg/model"
+	"go-gin-project/internal/pkg/repository"
 
 	"google.golang.org/grpc"
 )
 
-func StartGrpcServer(cache interfaces.CacheInterface) error {
+func StartGrpcServer(cache model.CacheService) error {
 	// Create services using the already initialized DB and cache
 	if config.DB == nil {
 		return fmt.Errorf("database connection is not initialized")
 	}
 
 	// Create services
-	userService := services.NewUserService(config.DB, cache)
+	userRepo := repository.NewUserRepository(config.DB)
+	userService := service.NewUserService(userRepo, cache)
 	grpcServer := grpc.NewServer()
 	userGrpcService := NewUserGrpcService(userService)
 	proto.RegisterUserServiceServer(grpcServer, userGrpcService)
