@@ -5,24 +5,21 @@ import (
 
 	"go-gin-project/config"
 	"go-gin-project/grpc/server"
-	"go-gin-project/services"
+	"go-gin-project/internal/pkg/cache"
 )
 
 func main() {
-	// Initialize DB first
 	if err := config.InitDB(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Initialize cache
-	cache, err := services.NewRedisCache()
+	cacheService, err := cache.New()
 	if err != nil {
 		log.Printf("Warning: Failed to initialize Redis: %v", err)
 		log.Println("Application will continue without caching")
 	}
 
-	// Start gRPC server
-	if err := server.StartGrpcServer(cache); err != nil {
+	if err := server.StartGrpcServer(cacheService); err != nil {
 		log.Fatalf("Failed to start gRPC server: %v", err)
 	}
 }
