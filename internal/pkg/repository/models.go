@@ -89,3 +89,8 @@ func toPaymentModel(p *model.Payment) *paymentModel {
 		PaymentStatus: p.PaymentStatus,
 	}
 }
+
+// Migrate runs GORM AutoMigrate for all repository models.
+func Migrate(db *gorm.DB) error {
+	return db.AutoMigrate(&userModel{}, &paymentModel{})
+}

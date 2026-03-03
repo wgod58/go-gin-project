@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"go-gin-project/models"
 	"log"
 	"os"
+
+	"go-gin-project/internal/pkg/repository"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
@@ -56,19 +57,10 @@ func InitDB() error {
 
 // migrateModels handles the auto-migration of database models
 func migrateModels(db *gorm.DB) error {
-	// List of models to migrate
-	models := []interface{}{
-		&models.User{},
-		&models.Payment{},
+	if err := repository.Migrate(db); err != nil {
+		return fmt.Errorf("failed to migrate database: %w", err)
 	}
-
-	// Migrate each model
-	for _, model := range models {
-		if err := db.AutoMigrate(model); err != nil {
-			return fmt.Errorf("failed to migrate %T: %w", model, err)
-		}
-	}
-
+	log.Println("Database migrations successful")
 	return nil
 }
 
